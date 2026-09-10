@@ -26,6 +26,11 @@ public class Player {
     private static final float TERMINAL_VELOCITY = -50.0f;
     private static final float MOUSE_SENSITIVITY = 0.0026f;
     private static final float EPS = 1e-4f;
+    private static final float SWIM_SPEED = 2.6f;
+    private static final float SWIM_SPRINT_SPEED = 4.0f;
+    private static final float SWIM_UP_SPEED = 4.0f;
+    private static final float WATER_GRAVITY = 10.0f;
+    private static final float WATER_TERMINAL = -4.0f;
 
     private final Vector3f position = new Vector3f(0.5f, 40f, 0.5f); // stopy
     private final Vector3f velocity = new Vector3f();
@@ -40,6 +45,10 @@ public class Player {
     private double lastMouseX = 0;
     private double lastMouseY = 0;
     private boolean mouseInitialized = false;
+
+    private float sensitivity = 1.0f;
+    private boolean inWater = false;
+    private boolean headInWater = false;
 
     public void setPosition(float x, float y, float z) {
         position.set(x, y, z);
@@ -63,6 +72,36 @@ public class Player {
         velocity.y = 0;
     }
 
+    public void setSensitivity(float sensitivity) {
+        this.sensitivity = sensitivity;
+    }
+
+    public float getYaw() {
+        return yaw;
+    }
+
+    public void setYaw(float yaw) {
+        this.yaw = yaw;
+    }
+
+    public float getPitch() {
+        return pitch;
+    }
+
+    public void setPitch(float pitch) {
+        this.pitch = pitch;
+    }
+
+    /** Czy korpus gracza jest w wodzie. */
+    public boolean isInWater() {
+        return inWater;
+    }
+
+    /** Czy oczy gracza sa pod woda. */
+    public boolean isHeadInWater() {
+        return headInWater;
+    }
+
     /** Pozycja oczu (do kamery i raycastu). */
     public Vector3f getEyePosition() {
         return eye.set(position.x, position.y + EYE_HEIGHT, position.z);
@@ -81,6 +120,8 @@ public class Player {
         float dt = (float) Math.min(deltaTime, 0.05);
 
         updateLook(window);
+        updateWaterState(world);
+        boolean swimming = inWater && !flying;
 
         // Ruch poziomy wzgledem kursora (yaw).
         float sin = (float) Math.sin(yaw);
@@ -116,13 +157,18 @@ public class Player {
 
         boolean sprintKey = window.isKeyPressed(GLFW_KEY_LEFT_CONTROL)
                 || (!flying && window.isKeyPressed(GLFW_KEY_LEFT_SHIFT));
-        float speed = flying
-                ? (sprintKey ? FLY_SPRINT_SPEED : FLY_SPEED)
-                : (sprintKey ? SPRINT_SPEED : WALK_SPEED);
+        float speed;
+        if (flying) {
+            speed = sprintKey ? FLY_SPRINT_SPEED : FLY_SPEED;
+        } else if (swimming) {
+            speed = sprintKey ? SWIM_SPRINT_SPEED : SWIM_SPEED;
+        } else {
+            speed = sprintKey ? SPRINT_SPEED : WALK_SPEED;
+        }
         velocity.x = wishX * speed;
         velocity.z = wishZ * speed;
 
-        // Pion: latanie albo grawitacja + skok.
+        // Pion: latanie, plywanie albo grawitacja + skok.
         if (flying) {
             float up = 0;
             if (window.isKeyPressed(GLFW_KEY_SPACE)) {
@@ -132,6 +178,15 @@ public class Player {
                 up -= 1;
             }
             velocity.y = up * (sprintKey ? FLY_VERTICAL_SPEED * 1.6f : FLY_VERTICAL_SPEED);
+        } else if (swimming) {
+            velocity.y -= WATER_GRAVITY * dt;
+            if (velocity.y < WATER_TERMINAL) {
+                velocity.y = WATER_TERMINAL;
+            }
+            if (window.isKeyPressed(GLFW_KEY_SPACE)) {
+                velocity.y = SWIM_UP_SPEED;
+                onGround = false;
+            }
         } else {
             velocity.y -= GRAVITY * dt;
             if (velocity.y < TERMINAL_VELOCITY) {
@@ -171,14 +226,25 @@ public class Player {
         float dy = (float) (my - lastMouseY);
         lastMouseX = mx;
         lastMouseY = my;
-        yaw -= dx * MOUSE_SENSITIVITY;
-        pitch -= dy * MOUSE_SENSITIVITY;
+        yaw -= dx * MOUSE_SENSITIVITY * sensitivity;
+        pitch -= dy * MOUSE_SENSITIVITY * sensitivity;
         if (pitch > 1.55f) {
             pitch = 1.55f;
         }
         if (pitch < -1.55f) {
             pitch = -1.55f;
         }
+    }
+
+    private void updateWaterState(World world) {
+        int bx = (int) Math.floor(position.x);
+        int bz = (int) Math.floor(position.z);
+        byte body = world.getBlock(bx, (int) Math.floor(position.y + 0.4f), bz);
+        byte feet = world.getBlock(bx, (int) Math.floor(position.y + 0.1f), bz);
+        byte head = world.getBlock(bx, (int) Math.floor(position.y + EYE_HEIGHT), bz);
+        byte water = com.aiminecraft.world.Block.WATER.id;
+        inWater = body == water || feet == water;
+        headInWater = head == water;
     }
 
     /** Przesuwa gracza wzdluz jednej osi i wysuwa go ze stalych blokow. */

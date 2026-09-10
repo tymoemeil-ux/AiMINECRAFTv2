@@ -15,25 +15,61 @@ import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
 
 /**
- * Atlas tekstur: 8 obrazkow 16x16 laczonych w jedna teksture 64x64.
- * Zeby podmienic teksture, wystarczy nadpisac PNG w resources/textures/blocks.
+ * Atlas tekstur blokow: 43 obrazki 16x16 w siatce 8x8 (128x128).
+ * Kolejnosc MUSI zgadzac sie z tools/make_assets.py (BLOCK_JOBS)
+ * oraz z indeksami kafli w Block.
  */
 public class TextureAtlas {
 
     public static final int TILE_SIZE = 16;
-    public static final int GRID = 4;
+    public static final int GRID = 8;
     public static final int ATLAS_SIZE = TILE_SIZE * GRID;
 
     /** Kolejnosc = indeksy kafli uzywane w Block. */
     private static final String[] TILE_FILES = {
-            "grass_top.png",   // 0
-            "grass_side.png",  // 1
-            "dirt.png",        // 2
-            "stone.png",       // 3
-            "oak_log_side.png", // 4
-            "oak_log_top.png",  // 5
-            "oak_leaves.png",   // 6
-            "bedrock.png"       // 7
+            "grass_top.png",        // 0
+            "grass_side.png",       // 1
+            "dirt.png",             // 2
+            "stone.png",            // 3
+            "oak_log_side.png",     // 4
+            "oak_log_top.png",      // 5
+            "oak_leaves.png",       // 6
+            "bedrock.png",          // 7
+            "water.png",            // 8
+            "sand.png",             // 9
+            "cobblestone.png",      // 10
+            "oak_planks.png",       // 11
+            "glass.png",            // 12
+            "coal_ore.png",         // 13
+            "iron_ore.png",         // 14
+            "gold_ore.png",         // 15
+            "diamond_ore.png",      // 16
+            "redstone_ore.png",     // 17
+            "birch_log_side.png",   // 18
+            "birch_log_top.png",    // 19
+            "birch_leaves.png",     // 20
+            "spruce_log_side.png",  // 21
+            "spruce_log_top.png",   // 22
+            "spruce_leaves.png",    // 23
+            "snow.png",             // 24
+            "dandelion.png",        // 25
+            "poppy.png",            // 26
+            "short_grass.png",      // 27
+            "torch.png",            // 28
+            "crafting_table_top.png",  // 29
+            "crafting_table_side.png", // 30
+            "cactus_side.png",      // 31
+            "cactus_top.png",       // 32
+            "gravel.png",           // 33
+            "obsidian.png",         // 34
+            "ice.png",              // 35
+            "bookshelf.png",        // 36
+            "pumpkin_side.png",     // 37
+            "pumpkin_top.png",      // 38
+            "melon_side.png",       // 39
+            "melon_top.png",        // 40
+            "sponge.png",           // 41
+            "bricks.png"            // 42
     };
 
     private static final float STEP = 1.0f / GRID;

@@ -3,8 +3,8 @@ package com.aiminecraft.world;
 import java.util.Random;
 
 /**
- * Klasyczny szum Perlina 2D + fraktalne skladanie (fbm).
- * Deterministyczny: ten sam seed zawsze daje ten sam teren.
+ * Klasyczny szum Perlina 2D i 3D + fbm.
+ * Deterministyczny: ten sam seed = ten sam swiat.
  */
 public final class PerlinNoise {
 
@@ -35,7 +35,7 @@ public final class PerlinNoise {
         return a + t * (b - a);
     }
 
-    private static double grad(int hash, double x, double y) {
+    private static double grad2(int hash, double x, double y) {
         switch (hash & 7) {
             case 0: return x + y;
             case 1: return x - y;
@@ -48,7 +48,14 @@ public final class PerlinNoise {
         }
     }
 
-    /** Szum w zakresie okolo [-1, 1]. */
+    private static double grad3(int hash, double x, double y, double z) {
+        int h = hash & 15;
+        double u = h < 8 ? x : y;
+        double v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
+        return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+    }
+
+    /** Szum 2D w zakresie okolo [-1, 1]. */
     public double noise(double x, double y) {
         int xi = (int) Math.floor(x);
         int yi = (int) Math.floor(y);
@@ -63,12 +70,11 @@ public final class PerlinNoise {
         int ba = p[p[X + 1] + Y];
         int bb = p[p[X + 1] + Y + 1];
         return lerp(
-                lerp(grad(aa, x, y), grad(ba, x - 1, y), u),
-                lerp(grad(ab, x, y - 1), grad(bb, x - 1, y - 1), u),
+                lerp(grad2(aa, x, y), grad2(ba, x - 1, y), u),
+                lerp(grad2(ab, x, y - 1), grad2(bb, x - 1, y - 1), u),
                 v);
     }
 
-    /** Kilka oktaw szumu nalozenych na siebie (fraktal). */
     public double fbm(double x, double y, int octaves, double lacunarity, double gain) {
         double amplitude = 1;
         double frequency = 1;
@@ -83,12 +89,72 @@ public final class PerlinNoise {
         return sum / normalization;
     }
 
-    /** Deterministyczny hash 2D -> [0, 1). Szybki i stabilny, idealny np. do drzew. */
+    /** Szum 3D w zakresie okolo [-1, 1] (jaskinie). */
+    public double noise3(double x, double y, double z) {
+        int xi = (int) Math.floor(x);
+        int yi = (int) Math.floor(y);
+        int zi = (int) Math.floor(z);
+        int X = xi & 255;
+        int Y = yi & 255;
+        int Z = zi & 255;
+        x -= xi;
+        y -= yi;
+        z -= zi;
+        double u = fade(x);
+        double v = fade(y);
+        double w = fade(z);
+        int aaa = p[p[p[X] + Y] + Z];
+        int aba = p[p[p[X] + Y + 1] + Z];
+        int aab = p[p[p[X] + Y] + Z + 1];
+        int abb = p[p[p[X] + Y + 1] + Z + 1];
+        int baa = p[p[p[X + 1] + Y] + Z];
+        int bba = p[p[p[X + 1] + Y + 1] + Z];
+        int bab = p[p[p[X + 1] + Y] + Z + 1];
+        int bbb = p[p[p[X + 1] + Y + 1] + Z + 1];
+        return lerp(
+                lerp(
+                        lerp(grad3(aaa, x, y, z), grad3(baa, x - 1, y, z), u),
+                        lerp(grad3(aba, x, y - 1, z), grad3(bba, x - 1, y - 1, z), u),
+                        v),
+                lerp(
+                        lerp(grad3(aab, x, y, z - 1), grad3(bab, x - 1, y, z - 1), u),
+                        lerp(grad3(abb, x, y - 1, z - 1), grad3(bbb, x - 1, y - 1, z - 1), u),
+                        v),
+                w);
+    }
+
+    public double fbm3(double x, double y, double z, int octaves, double lacunarity, double gain) {
+        double amplitude = 1;
+        double frequency = 1;
+        double sum = 0;
+        double normalization = 0;
+        for (int i = 0; i < octaves; i++) {
+            sum += amplitude * noise3(x * frequency, y * frequency, z * frequency);
+            normalization += amplitude;
+            amplitude *= gain;
+            frequency *= lacunarity;
+        }
+        return sum / normalization;
+    }
+
+    /** Deterministyczny hash 2D -> [0, 1). */
     public static double hash01(int x, int z, long seed) {
         long h = seed + (long) x * 0x9E3779B97F4A7C15L + (long) z * 0xBF58476D1CE4E5B9L;
         h ^= h >>> 30;
         h *= 0xBF58476D1CE4E5B9L;
         h ^= h >>> 27;
+        h *= 0x94D049BB133111EBL;
+        h ^= h >>> 31;
+        return ((h >>> 11) & ((1L << 53) - 1)) / (double) (1L << 53);
+    }
+
+    /** Deterministyczny hash 3D -> [0, 1) (rudy). */
+    public static double hash3(int x, int y, int z, long seed) {
+        long h = seed + (long) x * 0x9E3779B97F4A7C15L
+                + (long) y * 0xC2B2AE3D27D4EB4FL + (long) z * 0x165667B19E3779F9L;
+        h ^= h >>> 29;
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 32;
         h *= 0x94D049BB133111EBL;
         h ^= h >>> 31;
         return ((h >>> 11) & ((1L << 53) - 1)) / (double) (1L << 53);

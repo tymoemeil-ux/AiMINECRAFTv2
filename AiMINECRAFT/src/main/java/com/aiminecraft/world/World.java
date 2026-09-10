@@ -1,6 +1,5 @@
 package com.aiminecraft.world;
 
-import com.aiminecraft.render.Mesh;
 import com.aiminecraft.render.TextureAtlas;
 
 import java.util.ArrayDeque;
@@ -12,7 +11,8 @@ import java.util.Set;
 
 /**
  * Nieskonczony swiat z chunkow: generowanie danych, strumieniowanie
- * wokol gracza, przebudowa siatek i rysowanie.
+ * wokol gracza, przebudowa siatek i rysowanie w dwoch przebiegach
+ * (bloki + przezroczysta woda).
  */
 public class World {
 
@@ -23,6 +23,8 @@ public class World {
     private final Map<Long, Chunk> chunks = new HashMap<>();
     private final Deque<Chunk> dirtyQueue = new ArrayDeque<>();
     private final Set<Long> queuedKeys = new HashSet<>();
+    /** Chunki zmienione przez gracza (do zapisu). */
+    private final Set<Long> modifiedKeys = new HashSet<>();
 
     private int centerCx = Integer.MIN_VALUE;
     private int centerCz = Integer.MIN_VALUE;
@@ -59,28 +61,26 @@ public class World {
         return chunk.getLocal(Math.floorMod(x, Chunk.SIZE), y, Math.floorMod(z, Chunk.SIZE));
     }
 
-    public boolean isOpaque(int x, int y, int z) {
-        return Block.fromId(getBlock(x, y, z)).opaque;
-    }
-
     public boolean isSolid(int x, int y, int z) {
         return Block.fromId(getBlock(x, y, z)).solid;
     }
 
     /** Stawia blok i oznacza chunki do przebudowy (rowniez sasiadow na granicy). */
-    public void setBlock(int x, int y, int z, Block block) {
+    public void setBlock(int x, int y, int z, byte id) {
         if (y < 0 || y >= Chunk.HEIGHT) {
             return;
         }
         int cx = Math.floorDiv(x, Chunk.SIZE);
         int cz = Math.floorDiv(z, Chunk.SIZE);
-        Chunk chunk = getChunk(cx, cz);
+        long k = key(cx, cz);
+        Chunk chunk = chunks.get(k);
         if (chunk == null) {
             return;
         }
         int lx = Math.floorMod(x, Chunk.SIZE);
         int lz = Math.floorMod(z, Chunk.SIZE);
-        chunk.setLocal(lx, y, lz, block.id);
+        chunk.setLocal(lx, y, lz, id);
+        modifiedKeys.add(k);
         markDirty(cx, cz);
         if (lx == 0) {
             markDirty(cx - 1, cz);
@@ -94,6 +94,12 @@ public class World {
         if (lz == Chunk.SIZE - 1) {
             markDirty(cx, cz + 1);
         }
+    }
+
+    /** Blok do stawiania przez gracza (zwraca false, jesli nie mozna). */
+    public boolean canPlace(int id) {
+        Block block = Block.fromId((byte) id);
+        return block != Block.AIR && block != Block.WATER;
     }
 
     private void markDirty(int cx, int cz) {
@@ -122,7 +128,6 @@ public class World {
         int dataRadius = renderDistance + 1;
         int unloadRadius = renderDistance + 2;
 
-        // Wyladuj dalekie (razem z zasobami OpenGL).
         chunks.entrySet().removeIf(entry -> {
             Chunk chunk = entry.getValue();
             int dx = Math.abs(chunk.getCx() - playerCx);
@@ -135,7 +140,6 @@ public class World {
             return false;
         });
 
-        // Dogeneruj brakujace dane, od najblizszych chunkow.
         for (int r = 0; r <= dataRadius; r++) {
             for (int dx = -r; dx <= r; dx++) {
                 for (int dz = -r; dz <= r; dz++) {
@@ -149,12 +153,20 @@ public class World {
     }
 
     private void ensureData(int cx, int cz) {
-        if (getChunk(cx, cz) != null) {
+        Long k = key(cx, cz);
+        if (chunks.containsKey(k)) {
             return;
         }
         Chunk chunk = new Chunk(cx, cz);
-        generator.generate(chunk);
-        chunks.put(key(cx, cz), chunk);
+        // Najpierw sprobuj wczytac zmodyfikowany chunk z dysku.
+        boolean loaded = false;
+        if (saver != null) {
+            loaded = saver.loadInto(chunk, cx, cz);
+        }
+        if (!loaded) {
+            generator.generate(chunk);
+        }
+        chunks.put(k, chunk);
         markDirty(cx, cz);
         markDirty(cx + 1, cz);
         markDirty(cx - 1, cz);
@@ -162,7 +174,7 @@ public class World {
         markDirty(cx, cz - 1);
     }
 
-    /** Przebudowuje siatki chunkow (z limitem na klatke, zeby nie bylo sciec). Zwraca liczbe przebudowanych. */
+    /** Przebudowuje siatki chunkow (z limitem na klatke). Zwraca liczbe przebudowanych. */
     public int updateMeshes(int budget) {
         int processed = 0;
         int attempts = dirtyQueue.size() * 2 + 16;
@@ -179,8 +191,8 @@ public class World {
                 }
                 continue;
             }
-            Mesh mesh = ChunkMesher.build(this, chunk, atlas);
-            chunk.setMesh(mesh);
+            ChunkMesher.MeshPair pair = ChunkMesher.build(this, chunk, atlas);
+            chunk.setMeshes(pair.opaque, pair.translucent);
             processed++;
         }
         return processed;
@@ -211,11 +223,53 @@ public class World {
         return true;
     }
 
-    /** Rysuje wszystkie chunki (shader musi byc juz zbindowany). */
-    public void render() {
+    /** Rysuje wszystkie nieprzezroczyste chunki (shader musi byc zbindowany). */
+    public void renderOpaque() {
         atlas.bind();
         for (Chunk chunk : chunks.values()) {
-            chunk.draw();
+            chunk.drawOpaque();
+        }
+    }
+
+    /** Rysuje wode (po wlaczeniu blendingu). */
+    public void renderTranslucent() {
+        atlas.bind();
+        for (Chunk chunk : chunks.values()) {
+            chunk.drawTranslucent();
+        }
+    }
+
+    // ---------- Zapis swiata ----------
+
+    /** Podpiecie zapisu (ustawia Game). */
+    private WorldSave saver;
+
+    public void setSaver(WorldSave saver) {
+        this.saver = saver;
+    }
+
+    /** Zapisuje wszystkie zmodyfikowane chunki na dysk. */
+    public void flushModified() {
+        if (saver == null || modifiedKeys.isEmpty()) {
+            return;
+        }
+        for (Long k : modifiedKeys) {
+            Chunk chunk = chunks.get(k);
+            if (chunk != null) {
+                saver.saveChunk(chunk);
+            }
+        }
+        // Zmodyfikowane, ale juz wyladowane chunki maja dane na dysku.
+        modifiedKeys.clear();
+    }
+
+    /** Wymusza przebudowe wszystkich chunkow (np. po wczytaniu swiata). */
+    public void markAllDirty() {
+        for (Chunk chunk : chunks.values()) {
+            long k = key(chunk.getCx(), chunk.getCz());
+            if (queuedKeys.add(k)) {
+                dirtyQueue.add(chunk);
+            }
         }
     }
 
@@ -226,5 +280,6 @@ public class World {
         chunks.clear();
         dirtyQueue.clear();
         queuedKeys.clear();
+        modifiedKeys.clear();
     }
 }

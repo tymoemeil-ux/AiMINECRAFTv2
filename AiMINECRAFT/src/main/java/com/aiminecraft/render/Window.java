@@ -27,6 +27,9 @@ public class Window {
     private final double[] cursorX = new double[1];
     private final double[] cursorY = new double[1];
 
+    private final java.util.ArrayDeque<Integer> charQueue = new java.util.ArrayDeque<>();
+    private double scrollAccum = 0;
+
     public Window(int startWidth, int startHeight, String title) {
         this.startWidth = startWidth;
         this.startHeight = startHeight;
@@ -57,6 +60,15 @@ public class Window {
                     (videoMode.width() - startWidth) / 2,
                     (videoMode.height() - startHeight) / 2);
         }
+
+        glfwSetCharCallback(handle, (win, codepoint) -> {
+            if (charQueue.size() < 256) {
+                charQueue.add(codepoint);
+            }
+        });
+        glfwSetScrollCallback(handle, (win, xoffset, yoffset) -> {
+            scrollAccum += yoffset;
+        });
 
         glfwMakeContextCurrent(handle);
         glfwSwapInterval(1); // vsync
@@ -130,6 +142,27 @@ public class Window {
         glfwGetCursorPos(handle, cursorX, cursorY);
     }
 
+    /** Pobiera wpisany znak (chat) albo -1, jesli kolejka pusta. */
+    public int pollChar() {
+        Integer cp = charQueue.poll();
+        return cp != null ? cp : -1;
+    }
+
+    public void clearCharQueue() {
+        charQueue.clear();
+    }
+
+    /** Pobiera i zeruje ruch kolka myszy (hotbar, listy). */
+    public double consumeScroll() {
+        double s = scrollAccum;
+        scrollAccum = 0;
+        return s;
+    }
+
+    public void setVsync(boolean vsync) {
+        glfwSwapInterval(vsync ? 1 : 0);
+    }
+
     /** true = mysz zlapana (rozgladanie), false = kursor wolny. */
     public void setCursorCaptured(boolean captured) {
         cursorCaptured = captured;
@@ -138,6 +171,10 @@ public class Window {
 
     public boolean isCursorCaptured() {
         return cursorCaptured;
+    }
+
+    public void requestClose() {
+        glfwSetWindowShouldClose(handle, true);
     }
 
     public void destroy() {

@@ -8,16 +8,12 @@ package com.aiminecraft;
  */
 public class Main {
 
+    /**
+     * Punkt startowy gry. Seed wybiera sie w menu (lub losuje),
+     * ale nadal mozna go podac jako argument.
+     */
     public static void main(String[] args) {
-        long seed = System.currentTimeMillis();
-        if (args.length > 0) {
-            try {
-                seed = Long.parseLong(args[0].trim());
-            } catch (NumberFormatException e) {
-                seed = args[0].hashCode();
-            }
-        }
-        System.out.println("Seed swiata: " + seed);
-        new Game(seed).run();
+        String argSeed = args.length > 0 ? args[0].trim() : "";
+        new Game().run(argSeed);
     }
 }
