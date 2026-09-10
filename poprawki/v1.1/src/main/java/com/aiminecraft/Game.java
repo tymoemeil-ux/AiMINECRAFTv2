@@ -53,7 +53,13 @@ public class Game {
     private boolean rightPrev = false;
     private boolean escPrev = false;
     private boolean flyKeyPrev = false;
+    private boolean cullKeyPrev = false;
+    private boolean fogKeyPrev = false;
     private final boolean[] digitPrev = new boolean[PALETTE.length];
+
+    // Awaryjne przelaczniki renderingu (C = culling, V = mgla).
+    private boolean cullEnabled = true;
+    private boolean fogEnabled = true;
 
     private double breakCooldown = 0;
     private double placeCooldown = 0;
@@ -192,6 +198,27 @@ public class Game {
             }
             digitPrev[i] = d;
         }
+
+        // C: awaryjne wylaczenie cullingu (test renderingu).
+        boolean cullKey = window.isKeyPressed(GLFW_KEY_C);
+        if (cullKey && !cullKeyPrev && window.isCursorCaptured()) {
+            cullEnabled = !cullEnabled;
+            if (cullEnabled) {
+                glEnable(GL_CULL_FACE);
+            } else {
+                glDisable(GL_CULL_FACE);
+            }
+            System.out.println("Culling: " + (cullEnabled ? "WL" : "WYL"));
+        }
+        cullKeyPrev = cullKey;
+
+        // V: awaryjne wylaczenie mgly (test renderingu).
+        boolean fogKey = window.isKeyPressed(GLFW_KEY_V);
+        if (fogKey && !fogKeyPrev && window.isCursorCaptured()) {
+            fogEnabled = !fogEnabled;
+            System.out.println("Mgla: " + (fogEnabled ? "WL" : "WYL"));
+        }
+        fogKeyPrev = fogKey;
     }
 
     private void render(BlockRaycast.Hit hit) {
@@ -210,8 +237,8 @@ public class Game {
         blockShader.setMatrix4f("uView", view);
         blockShader.setInt("uAtlas", 0);
         blockShader.setVector3f("uFogColor", SKY_COLOR);
-        blockShader.setFloat("uFogStart", RENDER_DISTANCE * Chunk.SIZE * 0.5f);
-        blockShader.setFloat("uFogEnd", RENDER_DISTANCE * Chunk.SIZE * 0.92f);
+        blockShader.setFloat("uFogStart", fogEnabled ? RENDER_DISTANCE * Chunk.SIZE * 0.5f : 100000f);
+        blockShader.setFloat("uFogEnd", fogEnabled ? RENDER_DISTANCE * Chunk.SIZE * 0.92f : 200000f);
         world.render();
         blockShader.unbind();
 
@@ -237,6 +264,31 @@ public class Game {
                     PALETTE[selectedIndex].displayName, selectedIndex + 1,
                     player.isFlying() ? "WL" : "WYL", seed));
         }
+    }
+
+    /** Wypisuje diagnostyke startowa - ulatwia znalezienie problemu. */
+    private void printDiagnostics(int spawnH, int meshed) {
+        System.out.println("=== DIAGNOSTYKA ===");
+        System.out.println("OpenGL: " + glGetString(GL_VENDOR)
+                + " / " + glGetString(GL_RENDERER)
+                + " / " + glGetString(GL_VERSION));
+        System.out.println("Chunki: " + world.getChunkCount()
+                + ", przebudowanych siatek: " + meshed
+                + ", indeksow razem: " + world.getTotalIndices());
+        Block top = Block.fromId(world.getBlock(0, spawnH, 0));
+        Block above = Block.fromId(world.getBlock(0, spawnH + 1, 0));
+        System.out.println("Spawn: kolumna (0,0) h=" + spawnH
+                + ", blok na h=" + top.displayName + "(" + top.id + ")"
+                + ", nad nim=" + above.displayName + "(" + above.id + ")");
+        Vector3f eye = player.getEyePosition();
+        Vector3f dir = player.getDirection();
+        System.out.println(String.format("Kamera: oko=(%.2f, %.2f, %.2f) kierunek=(%.2f, %.2f, %.2f)",
+                eye.x, eye.y, eye.z, dir.x, dir.y, dir.z));
+        if (world.getTotalIndices() == 0) {
+            System.out.println("UWAGA: siatki sa puste - swiat nie wygenerowal geometrii!");
+        }
+        System.out.println("Testy: C = culling WL/WYL, V = mgla WL/WYL");
+        System.out.println("===================");
     }
 
     private boolean blockIntersectsPlayer(int bx, int by, int bz) {
