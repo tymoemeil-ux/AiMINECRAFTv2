@@ -15,10 +15,15 @@ reszta atlasu byłaby pusta). Sam plik `font.png` jest dobry, zły był tylko te
 ## Jak naprawić? (2 sposoby)
 
 ### Sposób 1 — nowy ZIP (najłatwiejszy) ⭐
-Pobierz z repo nowy **`AiMINECRAFT.zip`** (wersja 2.0.0 + fix) i rozpakuj do świeżego katalogu.
+Pobierz z repo nowy **`AiMINECRAFT.zip`** i rozpakuj do świeżego katalogu.
+(Uwaga: po v2.1 wyszedł jeszcze fix v2.2 na „krzaki” w foncie —
+świeży ZIP zawiera już oba fixy.)
 
 ### Sposób 2 — podmień 1 plik 📄
 Weź `FontAtlas.java` z folderu `v2.1/src/...` i podmień nim plik w projekcie:
 `src/main/java/com/aiminecraft/render/FontAtlas.java`
 
-Zapisz (`Ctrl+S`) i kliknij ▶ — menu gry powinno się pojawić!
+Zapisz (`Ctrl+S`) i kliknij ▶.
+
+⛔ UWAGA: sam fix v2.1 nie wystarcza — font pokaże „krzaki”
+(złe znaki). Dołóż też fix **v2.2** (2 pliki) albo pobierz nowy ZIP.
