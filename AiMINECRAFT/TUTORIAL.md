@@ -144,10 +144,10 @@ src/main/resources/
 ## 8. Typowe problemy ❓
 
 **Widać tylko niebieskie niebo (brak terenu)** →
-najpierw naciśnij `C` (wyłącza culling), potem `V` (wyłącza mgłę).
-Jeśli któreś pomaga — daj znać które! Tak czy siak skopiuj z konsoli
-cały blok `=== DIAGNOSTYKA ===` (karta graficzna, chunki, indeksy) —
-po nim od razu widać, gdzie leży problem.
+naprawione w wersji 1.1.0 — pobierz nowy ZIP! (Winne było nieustawianie
+macierzy kamery: `flip()` po absolutnym zapisie JOML dawał `count = 0`.)
+Jeśli mimo to coś jest nie tak: naciśnij `C` / `V` i wyślij z konsoli
+blok `=== DIAGNOSTYKA ===`.
 
 **„No JDK specified” / czerwony kod** → File → Project Structure → SDK → Download JDK 17.
 
