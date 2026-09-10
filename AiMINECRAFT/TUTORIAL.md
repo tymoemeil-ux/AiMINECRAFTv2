@@ -70,6 +70,10 @@ mvn compile exec:java
 | `G` | panel admina |
 | `F3` | nakładka diagnostyczna |
 | `Esc` | pauza / zamykanie okien |
+| `F11` | pelny ekran WL / WYL |
+| `Strzalki` + `Enter` | obsluga menu bez myszy (wybor swiata, ustawienia) |
+| `1`–`3` / `1`–`8` | skroty w menu, pauzie i panelu admina |
+| `Strzalki` (w grze) | awaryjne rozgladanie bez myszy |
 
 W tytule okna widzisz FPS, pozycję, tryb gry, porę dnia i seed.
 
