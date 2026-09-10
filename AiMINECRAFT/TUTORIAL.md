@@ -143,6 +143,12 @@ src/main/resources/
 
 ## 8. Typowe problemy ❓
 
+**Widać tylko niebieskie niebo (brak terenu)** →
+najpierw naciśnij `C` (wyłącza culling), potem `V` (wyłącza mgłę).
+Jeśli któreś pomaga — daj znać które! Tak czy siak skopiuj z konsoli
+cały blok `=== DIAGNOSTYKA ===` (karta graficzna, chunki, indeksy) —
+po nim od razu widać, gdzie leży problem.
+
 **„No JDK specified” / czerwony kod** → File → Project Structure → SDK → Download JDK 17.
 
 **Maven nic nie pobiera / „Cannot resolve symbol lwjgl”** →
